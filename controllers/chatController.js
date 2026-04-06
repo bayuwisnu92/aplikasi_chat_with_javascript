@@ -2,7 +2,9 @@ const Message = require('../models/message');
 const User = require('../models/users');
 const db = require('../db');
 const Conversation = require('../models/conversationModel');
+
 class ChatController {
+  
   static async newChatBuild(req,res){
   try {
     const { otherUserId } = req.body;
@@ -70,20 +72,28 @@ class ChatController {
     });
   }
 };
-  static async sendMessage(req) {
+ static async sendMessage(req) {
   try {
-
     const { content } = req.body;
     const { conversationId } = req.params;
     const senderId = req.user.userId;
 
-    let finalContent = content || '';
+    // 1. Ambil data conversation untuk mencari receiverId
+    const conversation = await Conversation.getById(conversationId);
+    if (!conversation) throw new Error("Conversation tidak ditemukan");
 
+    // Tentukan siapa penerimanya
+    const receiverId = conversation.user_one === senderId 
+      ? conversation.user_two 
+      : conversation.user_one;
+
+    let finalContent = content || '';
     let imageUrl = null;
 
     if (req.file) {
       imageUrl = `http://localhost:3000/uploads/${req.file.filename}`;
-      finalContent += imageUrl;
+      // Jika ada teks + gambar, gabungkan. Jika hanya gambar, isi dengan URL.
+      finalContent = content ? `${content} ${imageUrl}` : imageUrl;
     }
 
     const messageId = await Message.create({
@@ -92,27 +102,23 @@ class ChatController {
       content: finalContent
     });
 
-    // ⬇️ return data ke route
+    // 2. Return data lengkap ke route (termasuk receiverId)
     return {
       messageId,
       conversationId,
       senderId,
-      senderName: req.user.username, // 🔥 ini yang bikin realtime gak "User"
+      receiverId, // <--- Sangat penting untuk update kontak realtime
+      senderName: req.user.username,
       content: finalContent,
       image: imageUrl,
       timestamp: new Date()
     };
 
   } catch (error) {
-
     console.error("sendMessage error:", error);
-
-    // ⬇️ lempar error ke route
     throw error;
-
   }
 }
-  
 
 
 static async getMessages(req, res) {

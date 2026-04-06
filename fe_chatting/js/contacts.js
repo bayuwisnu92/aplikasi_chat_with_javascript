@@ -487,17 +487,16 @@ const socket = io("http://localhost:3000", {
   }
 });
 socket.on("connect", () => {
-
   console.log("Socket connected:", socket.id);
 
-  if (conversationId) {
-    socket.emit("joinConversation", conversationId);
+  // 1. Join ke room pribadi (WAJIB agar bisa terima update list kapan saja)
+  if (currentUserId) {
+    socket.emit("joinPersonalRoom", currentUserId); 
   }
 
-  if (grupId) {
-    socket.emit("joinGroup", grupId);
-  }
-
+  // 2. Join ke conversation/group jika ada di URL
+  if (conversationId) socket.emit("joinConversation", conversationId);
+  if (grupId) socket.emit("joinGroup", grupId);
 });
 
 
@@ -663,51 +662,83 @@ div.innerHTML = `
 }
 let conversationMap = {};
 socket.on("newMessage", (message) => {
+  console.log("Pesan baru masuk untuk list:", message);
 
-  console.log("Realtime message:", message);
-
+  // A. Jika room chat yang bersangkutan sedang terbuka, tambah bubble chat
   if (conversationId && message.conversationId == conversationId) {
     appendMessage(message);
   }
-
-  console.log("map lookup:",
-    message.conversationId,
-    conversationMap[message.conversationId]
-  );
   if (grupId && message.groupId == grupId) {
     appendMessage(message);
   }
+
+  // B. UPDATE CONTACT LIST (Harus jalan terus terlepas chat sedang terbuka atau tidak)
   updateContactRealtime(message);
-  loadAllChatList();
-
 });
-
-function updateContactRealtime(message) {
-
-  const contact = document.querySelector(
-    `[data-conversation-id="${message.conversationId}"]`
-  );
-
-  if (!contact) return;
-
-  const lastMessage = contact.querySelector(".last-message");
-  const time = contact.querySelector(".message-time");
-
-  if (lastMessage) {
-    lastMessage.textContent = message.content;
-  }
-
-  if (time) {
-    time.textContent = new Date(message.timestamp).toLocaleTimeString();
-  }
-
+socket.on("updateContactList", (data) => {
+  // Cari element kartu chat berdasarkan conversationId
+  const contactCard = document.querySelector(`[data-conversation-id="${data.conversationId}"]`);
   const container = document.getElementById("contacts-list");
 
-  contact.remove();
-  container.prepend(contact);
+  if (contactCard) {
+    // 1. Update pesan terakhir & waktu
+    const lastMsg = contactCard.querySelector(".last-message");
+    const timeMsg = contactCard.querySelector(".message-time");
+    
+    if (lastMsg) lastMsg.textContent = data.content;
+    if (timeMsg) timeMsg.textContent = "Baru saja";
 
+    // 2. Pindahkan ke posisi paling atas
+    container.prepend(contactCard);
+    
+    // 3. Tambahkan efek 'blink' biar keren
+    contactCard.style.transition = "background 0.5s";
+    contactCard.style.backgroundColor = "#e8f0fe";
+    setTimeout(() => { contactCard.style.backgroundColor = ""; }, 1000);
+  } else {
+    // Jika kontaknya belum ada di list (chat baru), ambil ulang list dari API
+    loadAllChatList();
+  }
+});
+function updateContactRealtime(message) {
+  const container = document.getElementById("contacts-list");
+  if (!container) return;
+
+  // Cari elemen kontak (Private atau Group)
+  let selector = message.conversationId 
+    ? `[data-conversation-id="${message.conversationId}"]` 
+    : `[data-group-id="${message.groupId}"]`;
+    
+  let contactElem = document.querySelector(selector);
+
+  if (contactElem) {
+    // 1. Update Pesan Terakhir
+    const lastMsgElem = contactElem.querySelector(".last-message");
+    if (lastMsgElem) {
+      // Logic deteksi gambar agar tidak muncul URL panjang
+      const isImage = message.content.includes('http://localhost:3000/uploads/');
+      const textDisplay = isImage ? "📷 Gambar" : message.content;
+      
+      // Jika grup, tambahkan nama pengirim
+      lastMsgElem.textContent = message.groupId 
+        ? `${message.senderName}: ${textDisplay}` 
+        : textDisplay;
+    }
+
+    // 2. Update Waktu
+    const timeElem = contactElem.querySelector(".message-time");
+    if (timeElem) {
+      timeElem.textContent = "Baru saja";
+    }
+
+    // 3. Pindahkan ke paling atas
+    container.prepend(contactElem);
+  } else {
+    // Jika kontaknya belum ada di list (chat baru dari orang baru), 
+    // panggil fungsi load agar list di-refresh dari database
+    loadAllChatList();
+  }
 }
-
 
 // ============================
 // Fungsi: Ambil Pesan

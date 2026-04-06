@@ -90,32 +90,42 @@ route.get('/:conversationId/messages',
   chatController.getMessages
 );
 
+/* =========================
+   PRIVATE CHAT
+========================= */
+
 route.post('/:conversationId/send',
   authenticate,
   upload.single('image'),
   async (req, res) => {
-
     try {
-
-      const result = await chatController.sendMessage(req);
-
+      const result = await chatController.sendMessage(req); // Pastikan sudah return receiverId seperti bahasan tadi
       const io = getIO();
 
-      io.to(req.params.conversationId)
-        .emit("newMessage", result);
+      // 1. Update Bubble Chat (untuk yang sedang buka room chat)
+      io.to(req.params.conversationId).emit("newMessage", result);
 
-      res.status(200).json(result);
-
-    } catch (err) {
-
-      console.error("socket send error:", err);
-
-      res.status(500).json({
-        message: 'Gagal mengirim pesan'
+      // 2. Update Daftar Kontak untuk PENERIMA (naik ke atas + pesan terakhir)
+      io.to("user_" + result.receiverId).emit("updateContactList", {
+        conversationId: result.conversationId,
+        senderName: result.senderName,
+        content: result.content,
+        timestamp: result.timestamp
       });
 
-    }
+      // 3. Update Daftar Kontak untuk PENGIRIM (agar chat dia juga naik ke atas sendiri)
+      io.to("user_" + req.user.userId).emit("updateContactList", {
+        conversationId: result.conversationId,
+        senderName: "Anda",
+        content: result.content,
+        timestamp: result.timestamp
+      });
 
+      res.status(200).json(result);
+    } catch (err) {
+      console.error("socket send error:", err);
+      res.status(500).json({ message: 'Gagal mengirim pesan' });
+    }
   }
 );
 
@@ -192,32 +202,34 @@ route.get('/grup/:groupId/messages',
   chatGroup.findBygroupId
 );
 
+/* =========================
+   GROUP CHAT
+========================= */
+
 route.post('/grup/:groupId/send',
   authenticate,
   upload.single('image'),
   async (req, res) => {
-
     try {
-
       const result = await chatGroup.sendMessage(req);
-
       const io = getIO();
 
-      io.to("group_" + req.params.groupId)
-        .emit("newGroupMessage", result);
+      // 1. Kirim ke room grup
+      io.to("group_" + req.params.groupId).emit("newGroupMessage", result);
 
-      res.status(200).json(result);
-
-    } catch (err) {
-
-      console.error("socket group error:", err);
-
-      res.status(500).json({
-        message: 'Gagal kirim pesan grup'
+      // 2. Kirim event untuk update daftar kontak grup bagi semua orang
+      io.emit("updateGroupContactList", {
+        groupId: req.params.groupId,
+        senderName: result.senderName,
+        lastMessage: result.message_text || '📷 Mengirim gambar',
+        timestamp: result.created_at
       });
 
+      res.status(200).json(result);
+    } catch (err) {
+      console.error("socket group error:", err);
+      res.status(500).json({ message: 'Gagal kirim pesan grup' });
     }
-
   }
 );
 

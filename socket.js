@@ -32,7 +32,11 @@ const initSocket = (server) => {
       console.log("USER ID FROM TOKEN:", userId);
 
       socket.userId = userId;
-
+      // === TAMBAHKAN BARIS INI ===
+      // Setiap user join ke room unik berdasarkan ID-nya sendiri
+      socket.join("user_" + userId); 
+      console.log(`User ${userId} bergabung ke room pribadi: user_${userId}`);
+      // ===========================
       // update status online
       db.query(
         "UPDATE users SET status='online' WHERE user_id=?",
