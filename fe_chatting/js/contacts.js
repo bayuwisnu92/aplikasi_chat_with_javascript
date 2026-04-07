@@ -4,7 +4,7 @@ let currentUserId = null;
 let dataGlobal = []
 
 if (!token) {
-  window.location.href = 'login.html';
+  window.location.href = './views/login.html';
 } else {
   verifyToken(token)
     .then(userData => {
@@ -81,7 +81,7 @@ function loadProtectedContent(userData) {
           if(response.status === 200){
             showAlert('Logout berhasil!', 'success');
             localStorage.removeItem('token');
-            window.location.href = '/views/login.html';
+            window.location.href = 'login.html';
           }
         } catch (error) {
           console.error('Logout error:', error);
@@ -500,7 +500,35 @@ socket.on("connect", () => {
 });
 
 
+// Contoh fungsi saat user klik salah satu grup di UI
+function bukaGrup(idGrup) {
+  currentGrupId = idGrup; // Simpan ID grup yang sedang dibuka ke variabel global
+  
+  // BERITAHU BACKEND: "Saya mau masuk ke room grup ini"
+  socket.emit("joinGroup", idGrup); 
+  
+  loadMessagesGrup(idGrup); // Ambil history chat
+}
 
+socket.on("newGroupMessage", (data) => {
+  console.log("Ada pesan grup baru masuk:", data);
+
+  // CEK: Apakah pesan ini milik grup yang sedang saya buka?
+  // Gunakan 'groupId' (pastikan backend mengirim property ini di objek result)
+  if (data.groupId == currentGrupId) {
+      renderGroupMessage(data); // Fungsi untuk nambahin balon chat ke layar
+      scrollToBottom(); // Scroll otomatis ke bawah
+  } else {
+      // Opsi: Tampilkan notifikasi atau update angka "unread" di daftar grup
+      console.log("Pesan masuk di grup lain");
+      loadAllChatList(); // Update preview pesan terakhir di sidebar
+  }
+});
+
+socket.on("updateGroupContactList", (data) => {
+  console.log("Update sidebar grup:", data);
+  loadAllChatList(); // Panggil fungsi yang me-refresh daftar chat di samping
+});
 socket.on("user_status", (data) => {
 
   // update contact list
@@ -1101,15 +1129,15 @@ function decodeToken(token) {
 
 
 async function sendMessageGrup() {
-  const messageInput = document.getElementById('message-input');
-  const content = messageInput.value.trim();
-  const file = document.getElementById('file-input').files[0];
-  if (!content && !file) return;
-  const formData = new FormData();
-  formData.append('content', content);
-  if (file) {
-  formData.append('image', file);
-}
+      const messageInput = document.getElementById('message-input');
+      const content = messageInput.value.trim();
+      const file = document.getElementById('file-input').files[0];
+      if (!content && !file) return;
+      const formData = new FormData();
+      formData.append('content', content);
+      if (file) {
+      formData.append('image', file);
+    }
 
   try {
     const response = await fetch(`http://localhost:3000/api/grup/${grupId}/send`, {

@@ -88,28 +88,34 @@ static async findBygroupId(req,res){
         });
     }
 }
-static async sendMessage(req, res) {
+static async sendMessage(req) { // Hapus parameter res jika tidak dipakai kirim respon di sini
   try {
     const { content } = req.body;
-    const { groupId } = req.params;
+    const { groupId } = req.params; // Sesuai route: :groupId
     const senderId = req.user?.userId;
 
-    console.log({ content, groupId, senderId }); // Tambahkan ini
-    let finalcontent = content || ''
-    if(req.file){
-        const imageUrl = `http://localhost:3000/uploads/${req.file.filename}`;
-        finalcontent += imageUrl
+    let finalcontent = content || '';
+    if (req.file) {
+      const imageUrl = `http://localhost:3000/uploads/${req.file.filename}`;
+      finalcontent += imageUrl;
     }
+
     const messageId = await messageGrup.sendMessage({
       groupId,
       senderId,
-      content : finalcontent
+      content: finalcontent
     });
 
-    res.status(201).json({ messageId });
+    // CUKUP RETURN DATA SAJA
+    return { 
+      messageId, 
+      senderName: req.user?.username, // Pastikan ini ada untuk socket
+      message_text: content,
+      created_at: new Date() 
+    };
   } catch (error) {
-    console.error('SERVER ERROR:', error); // Log error ke console
-    res.status(500).json({ error: error.message });
+    console.error('SERVER ERROR:', error);
+    throw error; // Lempar error agar ditangkap catch di route
   }
 }
 

@@ -5,13 +5,16 @@ let io;
 const initSocket = (server) => {
   const { Server } = require("socket.io");
 
-  io = new Server(server, {
-    cors: {
-      origin: "http://127.0.0.1:5501",
-      methods: ["GET", "POST"],
-      credentials: true
-    }
-  });
+ io = new Server(server, {
+  cors: {
+    origin: [
+      "http://127.0.0.1:5501",
+      "https://bayuwisnu92.github.io"
+    ],
+    methods: ["GET", "POST"],
+    credentials: true
+  }
+});
 
   io.on("connection", (socket) => {
 
