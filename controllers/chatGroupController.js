@@ -171,6 +171,43 @@ static async editPesanGrup(req,res){
     res.status(500).json({ error: 'Terjadi kesalahan saat mengedit pesan' });
   }
 }
+static async addMember(req, res) {
+    try {
+        const { groupId } = req.params;
+        const { targetUserId } = req.body; // ID user yang ingin dimasukkan
+
+        // 1. Cek dulu apakah user tersebut sudah jadi anggota atau belum
+        const [existing] = await db.query(
+            "SELECT * FROM group_members WHERE group_id = ? AND user_id = ?",
+            [groupId, targetUserId]
+        );
+
+        if (existing.length > 0) {
+            return res.status(400).json({ 
+                status: 'error', 
+                message: 'User tersebut sudah menjadi anggota grup ini.' 
+            });
+        }
+
+        // 2. Jika belum ada, baru masukkan (Insert)
+        await db.query(
+            "INSERT INTO group_members (group_id, user_id, joined_at) VALUES (?, ?, NOW())",
+            [groupId, targetUserId]
+        );
+
+        res.status(200).json({ 
+            status: 'success', 
+            message: 'Berhasil menambahkan anggota baru ke grup.' 
+        });
+
+    } catch (error) {
+        console.error("Error addMember:", error);
+        res.status(500).json({ 
+            status: 'error', 
+            message: 'Gagal menambahkan anggota. Silakan coba lagi.' 
+        });
+    }
+}
 
 static async updatePesanGrup(req,res){
   try{

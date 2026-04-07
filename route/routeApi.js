@@ -270,7 +270,8 @@ route.get('/allGroup',
   authenticate,
   chatGroup.allGrup
 );
-
+// Endpoint: /api/grup/:groupId/add-member
+route.post('/grup/:groupId/add-member', authenticate, chatGroup.addMember);
 /* =========================
    EXPORT
 ========================= */
