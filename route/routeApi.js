@@ -271,6 +271,7 @@ route.get('/allGroup',
   chatGroup.allGrup
 );
 // Endpoint: /api/grup/:groupId/add-member
+route.get('/usersgrup/search', authenticate, chatGroup.searchUser);
 route.post('/grup/:groupId/add-member', authenticate, chatGroup.addMember);
 /* =========================
    EXPORT

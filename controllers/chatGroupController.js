@@ -2,6 +2,8 @@ const db = require('../db')
 
 const messageGrup = require('../models/messageGrup')
 
+const { getIO } = require('../socket'); // INI SERING LUPA DI-IMPORT
+
 
 class chatGroup{
     // controllers/groupController.js
@@ -174,38 +176,31 @@ static async editPesanGrup(req,res){
 static async addMember(req, res) {
     try {
         const { groupId } = req.params;
-        const { targetUserId } = req.body; // ID user yang ingin dimasukkan
+        const { targetUserId } = req.body;
 
-        // 1. Cek dulu apakah user tersebut sudah jadi anggota atau belum
-        const [existing] = await db.query(
-            "SELECT * FROM group_members WHERE group_id = ? AND user_id = ?",
-            [groupId, targetUserId]
-        );
-
-        if (existing.length > 0) {
-            return res.status(400).json({ 
-                status: 'error', 
-                message: 'User tersebut sudah menjadi anggota grup ini.' 
-            });
-        }
-
-        // 2. Jika belum ada, baru masukkan (Insert)
+        // 1. Simpan ke Database
         await db.query(
             "INSERT INTO group_members (group_id, user_id, joined_at) VALUES (?, ?, NOW())",
             [groupId, targetUserId]
         );
 
-        res.status(200).json({ 
-            status: 'success', 
-            message: 'Berhasil menambahkan anggota baru ke grup.' 
+        // 2. Ambil Nama Grup untuk dikirim ke socket (opsional tapi bagus)
+        const [groupData] = await db.query("SELECT name FROM groups WHERE group_id = ?", [groupId]);
+        const groupName = groupData[0]?.name || "Grup Baru";
+
+        // 3. KIRIM SINYAL REAL-TIME
+        const io = getIO();
+        // Kirim ke room pribadi si target (user_ID)
+        io.to("user_" + targetUserId).emit("newGroupAssigned", {
+            groupId: groupId,
+            groupName: groupName,
+            message: `Anda telah ditambahkan ke grup ${groupName}`
         });
 
+        res.status(200).json({ status: 'success', message: 'Berhasil menambahkan anggota' });
     } catch (error) {
-        console.error("Error addMember:", error);
-        res.status(500).json({ 
-            status: 'error', 
-            message: 'Gagal menambahkan anggota. Silakan coba lagi.' 
-        });
+        console.error(error);
+        res.status(500).json({ status: 'error', message: 'Gagal' });
     }
 }
 
@@ -221,6 +216,24 @@ static async updatePesanGrup(req,res){
     res.status(500).json({ error: 'Terjadi kesalahan saat mengupdate pesan' });
   }
 
+}
+
+static async searchUser(req, res) {
+    try {
+        const { username } = req.query;
+        console.log("Mencari username:", username); // Ini harus muncul di terminal hitam
+
+        const [users] = await db.query(
+            "SELECT user_id, username FROM users WHERE username LIKE ?",
+            [`%${username}%`] // Hapus sementara filter 'AND user_id != ?'
+        );
+
+        console.log("Hasil dari DB:", users);
+        res.json(users);
+    } catch (error) {
+        console.error("Error SQL:", error);
+        res.status(500).json({ message: "Gagal" });
+    }
 }
 
 }
