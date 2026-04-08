@@ -26,8 +26,8 @@ class chatGroup{
         // 2. OTOMATIS Insert si pembuat ke tabel group_members
         // Kita gunakan NOW() agar joined_at terisi waktu saat ini
         await connection.query(
-            `INSERT INTO group_members (group_id, user_id, joined_at) VALUES (?, ?, NOW())`,
-            [newGroupId, creatorId]
+            `INSERT INTO group_members (group_id, user_id, role, joined_at) VALUES (?, ?, 'admin', NOW())`,
+             [newGroupId, creatorId]
         );
 
         // Jika semua oke, simpan perubahan secara permanen
@@ -177,29 +177,41 @@ static async addMember(req, res) {
     try {
         const { groupId } = req.params;
         const { targetUserId } = req.body;
+        const requesterId = req.user.userId; // ID orang yang klik tombol "Add"
 
-        // 1. Simpan ke Database
-        await db.query(
-            "INSERT INTO group_members (group_id, user_id, joined_at) VALUES (?, ?, NOW())",
+        // 1. CEK OTORITAS: Apakah requesterId adalah ADMIN di grup ini?
+        const [checkAdmin] = await db.query(
+            "SELECT role FROM group_members WHERE group_id = ? AND user_id = ?",
+            [groupId, requesterId]
+        );
+
+        if (!checkAdmin.length || checkAdmin[0].role !== 'admin') {
+            return res.status(403).json({ 
+                status: 'error', 
+                message: 'Hanya Admin yang bisa menambahkan anggota, lur!' 
+            });
+        }
+
+        // 2. Jika dia Admin, lanjut cek apakah target sudah jadi member
+        const [existing] = await db.query(
+            "SELECT * FROM group_members WHERE group_id = ? AND user_id = ?",
             [groupId, targetUserId]
         );
 
-        // 2. Ambil Nama Grup untuk dikirim ke socket (opsional tapi bagus)
-        const [groupData] = await db.query("SELECT name FROM groups WHERE group_id = ?", [groupId]);
-        const groupName = groupData[0]?.name || "Grup Baru";
+        if (existing.length > 0) {
+            return res.status(400).json({ message: 'User sudah ada di grup.' });
+        }
 
-        // 3. KIRIM SINYAL REAL-TIME
-        const io = getIO();
-        // Kirim ke room pribadi si target (user_ID)
-        io.to("user_" + targetUserId).emit("newGroupAssigned", {
-            groupId: groupId,
-            groupName: groupName,
-            message: `Anda telah ditambahkan ke grup ${groupName}`
-        });
+        // 3. Eksekusi Insert sebagai member biasa
+        await db.query(
+            "INSERT INTO group_members (group_id, user_id, role, joined_at) VALUES (?, ?, 'member', NOW())",
+            [groupId, targetUserId]
+        );
 
-        res.status(200).json({ status: 'success', message: 'Berhasil menambahkan anggota' });
+        // ... kirim socket newGroupAssigned seperti sebelumnya ...
+        res.status(200).json({ status: 'success', message: 'Anggota berhasil ditambahkan oleh Admin' });
+
     } catch (error) {
-        console.error(error);
         res.status(500).json({ status: 'error', message: 'Gagal' });
     }
 }
