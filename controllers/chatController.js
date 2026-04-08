@@ -2,6 +2,9 @@ const Message = require('../models/message');
 const User = require('../models/users');
 const db = require('../db');
 const Conversation = require('../models/conversationModel');
+const sharp = require('sharp');
+const path = require('path');
+const fs = require('fs');
 
 class ChatController {
   
@@ -72,45 +75,60 @@ class ChatController {
     });
   }
 };
- static async sendMessage(req) {
+static async sendMessage(req) {
   try {
     const { content } = req.body;
     const { conversationId } = req.params;
     const senderId = req.user.userId;
 
-    // 1. Ambil data conversation untuk mencari receiverId
+    // 1. Cari data conversation untuk menentukan receiverId
     const conversation = await Conversation.getById(conversationId);
     if (!conversation) throw new Error("Conversation tidak ditemukan");
 
-    // Tentukan siapa penerimanya
     const receiverId = conversation.user_one === senderId 
       ? conversation.user_two 
       : conversation.user_one;
 
-    let finalContent = content || '';
+    let messageType = 'text';
     let imageUrl = null;
 
+    // Cek apakah ada file yang diupload
     if (req.file) {
-      imageUrl = `http://localhost:3000/uploads/${req.file.filename}`;
-      // Jika ada teks + gambar, gabungkan. Jika hanya gambar, isi dengan URL.
-      finalContent = content ? `${content} ${imageUrl}` : imageUrl;
-    }
+    messageType = 'image';
+    
+    // 1. Tentukan nama file (pakai .webp supaya jauh lebih ringan)
+    const fileName = `chat-${Date.now()}.webp`;
+    const uploadPath = path.join(__dirname, '../public/uploads', fileName);
 
+    // 2. Proses Kompresi
+    await sharp(req.file.buffer) // Mengambil data dari memoryStorage
+        .resize({ width: 800, withoutEnlargement: true }) // Kecilkan lebar ke 800px (jika aslinya lebih besar)
+        .webp({ quality: 75 }) // Kompres kualitas ke 75% format WebP
+        .toFile(uploadPath);
+
+    imageUrl = fileName;
+}
+
+    // 2. Simpan ke Database
+    // Pastikan model Message.create kamu sudah mendukung field message_type dan image_url
     const messageId = await Message.create({
       conversationId,
       senderId,
-      content: finalContent
+      content: content || null, // Bisa null kalau hanya kirim gambar
+      messageType: messageType,
+      imageUrl: imageUrl
     });
 
-    // 2. Return data lengkap ke route (termasuk receiverId)
+    // 3. Return data lengkap untuk Socket.io
     return {
       messageId,
-      conversationId,
+      conversationId: parseInt(conversationId),
       senderId,
-      receiverId, // <--- Sangat penting untuk update kontak realtime
+      receiverId,
       senderName: req.user.username,
-      content: finalContent,
-      image: imageUrl,
+      content: content || '',
+      messageType, 
+      imageUrl, // Nama file untuk diolah di frontend
       timestamp: new Date()
     };
 
@@ -123,7 +141,6 @@ class ChatController {
 
 static async getMessages(req, res) {
   try {
-
     const { conversationId } = req.params;
     const currentUserId = req.user.userId;
 
@@ -131,28 +148,24 @@ static async getMessages(req, res) {
       return res.status(400).json({ error: 'ID percakapan tidak valid' });
     }
 
-    // Ambil data conversation
     const conversation = await Conversation.getById(conversationId);
-
     if (!conversation) {
       return res.status(404).json({ error: 'Conversation tidak ditemukan' });
     }
 
-    // Tentukan lawan chat
-    const otherUserId =
-      conversation.user_one === currentUserId
+    const otherUserId = conversation.user_one === currentUserId
         ? conversation.user_two
         : conversation.user_one;
 
-    // Ambil data user
     const lawanChat = await User.getById(otherUserId);
-
-    // Ambil pesan
     const rawMessages = await Message.findByConversation(conversationId);
 
+    // MAPPING DATA KE FRONTEND
     const messages = rawMessages.map(msg => ({
       messageId: msg.message_id,
       content: msg.content,
+      messageType: msg.message_type, // TAMBAHKAN INI
+      imageUrl: msg.image_url,       // TAMBAHKAN INI
       timestamp: msg.timestamp,
       sender: {
         id: msg.user_id,

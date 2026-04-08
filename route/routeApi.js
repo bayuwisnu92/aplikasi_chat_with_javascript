@@ -19,23 +19,20 @@ const path = require('path');
    MULTER CONFIG
 ========================= */
 
-const storage = multer.diskStorage({
-  destination: (req, file, cb) => {
-    cb(null, path.join(__dirname, '../public/uploads'));
-  },
-  filename: (req, file, cb) => {
-    cb(null, Date.now() + path.extname(file.originalname));
-  }
-});
+const storage = multer.memoryStorage();
 
 const upload = multer({
   storage,
   fileFilter: (req, file, cb) => {
+    // Tetap filter hanya gambar
     if (file.mimetype.startsWith('image/')) {
       cb(null, true);
     } else {
       cb(new Error('Hanya file gambar yang diperbolehkan'), false);
     }
+  },
+  limits: {
+    fileSize: 5 * 1024 * 1024 // Batasi upload awal maks 5MB
   }
 });
 
@@ -99,25 +96,30 @@ route.post('/:conversationId/send',
   upload.single('image'),
   async (req, res) => {
     try {
-      const result = await chatController.sendMessage(req); // Pastikan sudah return receiverId seperti bahasan tadi
+      const result = await chatController.sendMessage(req);
       const io = getIO();
 
-      // 1. Update Bubble Chat (untuk yang sedang buka room chat)
+      // Isi pesan untuk preview di sidebar (Daftar Kontak)
+      const previewContent = result.messageType === 'image' 
+        ? (result.content ? `📷 ${result.content}` : '📷 Mengirim gambar')
+        : result.content;
+
+      // 1. Update Bubble Chat (Realtime di room chat)
       io.to(req.params.conversationId).emit("newMessage", result);
 
-      // 2. Update Daftar Kontak untuk PENERIMA (naik ke atas + pesan terakhir)
+      // 2. Update Daftar Kontak untuk PENERIMA
       io.to("user_" + result.receiverId).emit("updateContactList", {
         conversationId: result.conversationId,
         senderName: result.senderName,
-        content: result.content,
+        content: previewContent, // Pakai preview agar muncul icon kamera
         timestamp: result.timestamp
       });
 
-      // 3. Update Daftar Kontak untuk PENGIRIM (agar chat dia juga naik ke atas sendiri)
+      // 3. Update Daftar Kontak untuk PENGIRIM
       io.to("user_" + req.user.userId).emit("updateContactList", {
         conversationId: result.conversationId,
         senderName: "Anda",
-        content: result.content,
+        content: previewContent,
         timestamp: result.timestamp
       });
 

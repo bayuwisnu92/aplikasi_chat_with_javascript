@@ -144,6 +144,8 @@ class User {
       END AS status,
 
       m.content AS last_message,
+      m.message_type,  /* <--- TAMBAHKAN INI */
+      m.image_url,     /* <--- TAMBAHKAN INI */
       m.sent_at AS last_message_time
 
     FROM conversations c
@@ -172,11 +174,7 @@ class User {
   `;
 
   const [rows] = await db.query(query, [
-    currentUserId,
-    currentUserId,
-    currentUserId,
-    currentUserId,
-    currentUserId
+    currentUserId, currentUserId, currentUserId, currentUserId, currentUserId
   ]);
 
   return rows;

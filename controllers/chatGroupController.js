@@ -91,25 +91,52 @@ static async allGrup(req, res) {
         res.status(500).json({ message: 'Gagal mengambil daftar grup' });
     }
 }
-static async findBygroupId(req,res){
-    try{
+static async findBygroupId(req, res) {
+    try {
         const groupId = req.params.groupId;
-        const rows = await messageGrup.findByGroupId(groupId)
+        const userId = req.user.userId; // AMBIL DARI TOKEN (WAJIB)
+
+        // 1. Ambil pesan grup
+        const rows = await messageGrup.findByGroupId(groupId);
+        
         const messages = rows.map(msg => ({
-      messageId: msg.message_id,
-      content: msg.content,
-      timestamp: msg.timestamp,
-      sender: {
-        id: msg.user_id,
-        username: msg.username,
-        stat:msg.status.length
-      }
-    }));
-        res.status(200).json(messages);
-    }catch(error){
+            messageId: msg.message_id,
+            content: msg.content,
+            timestamp: msg.timestamp,
+            sender: {
+                id: msg.user_id,
+                username: msg.username,
+                stat: msg.status // Sesuaikan dengan field di DB (online/offline)
+            }
+        }));
+
+        // 2. Ambil role user di grup tersebut
+        const [memberInfo] = await db.query(
+            "SELECT role FROM group_members WHERE group_id = ? AND user_id = ?",
+            [groupId, userId]
+        );
+
+        // Jika user ID 4 admin tapi tidak ditemukan di sini, berarti belum terdaftar di group_members
+        if (memberInfo.length === 0) {
+            return res.status(403).json({
+                status: 'error',
+                message: 'Anda bukan anggota grup ini'
+            });
+        }
+
+        const userRole = memberInfo[0].role; // DEFINISIKAN VARIABLE INI
+
+        // 3. Kirim respon
+        res.status(200).json({
+            role: userRole, // Sekarang userRole sudah ada isinya
+            messages: messages
+        });
+
+    } catch (error) {
+        console.error("Error findBygroupId:", error); // Muncul di terminal VS Code
         res.status(500).json({
             status: 'error',
-            message: 'Gagal mengambil daftar grup'
+            message: 'Gagal mengambil isi chat grup'
         });
     }
 }

@@ -4,30 +4,39 @@ const jwt = require('jsonwebtoken');
 
 
 class Message {
-  static async create({ conversationId, senderId, content }) {
+ static async create({ conversationId, senderId, content, messageType, imageUrl }) {
     const [result] = await db.execute(
-      'INSERT INTO messages (conversation_id, sender_id, content) VALUES (?, ?, ?)',
-      [conversationId, senderId, content]
+        `INSERT INTO messages 
+         (conversation_id, sender_id, content, message_type, image_url, sent_at) 
+         VALUES (?, ?, ?, ?, ?, NOW())`, // Ganti created_at jadi sent_at
+        [
+            conversationId, 
+            senderId, 
+            content || null, 
+            messageType || 'text', 
+            imageUrl || null
+        ]
     );
     return result.insertId;
-  }
+}
 
   static async findByConversation(conversationId) {
   const [rows] = await db.execute(`
-  SELECT 
-    m.message_id,
-    m.content,
-    m.sent_at AS timestamp,
-    u.user_id,
-    u.last_online,
-    u.status,
-    u.username
-  FROM messages m
-  JOIN users u ON m.sender_id = u.user_id
-  WHERE m.conversation_id = ?
-  ORDER BY m.sent_at ASC
-`, [conversationId]);
-;
+    SELECT 
+      m.message_id,
+      m.content,
+      m.message_type,  -- TAMBAHKAN INI
+      m.image_url,     -- TAMBAHKAN INI
+      m.sent_at AS timestamp,
+      u.user_id,
+      u.last_online,
+      u.status,
+      u.username
+    FROM messages m
+    JOIN users u ON m.sender_id = u.user_id
+    WHERE m.conversation_id = ?
+    ORDER BY m.sent_at ASC
+  `, [conversationId]);
 
   return rows;
 }
