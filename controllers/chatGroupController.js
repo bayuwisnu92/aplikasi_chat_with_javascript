@@ -3,6 +3,9 @@ const db = require('../db')
 const messageGrup = require('../models/messageGrup')
 
 const { getIO } = require('../socket'); // INI SERING LUPA DI-IMPORT
+const sharp = require('sharp');
+const path = require('path');
+const fs = require('fs');
 
 
 class chatGroup{
@@ -54,7 +57,7 @@ class chatGroup{
 }
 static async allGrup(req, res) {
     try {
-        const userId = req.user?.userId; // Pastikan middleware authenticate sudah jalan
+        const userId = req.user?.userId; 
 
         const [rows] = await db.query(
             `SELECT 
@@ -63,10 +66,11 @@ static async allGrup(req, res) {
                 g.created_by,
                 g.created_at,
                 gm_msg.content AS last_message,
+                gm_msg.message_type,  -- Ditambahkan agar sidebar tahu ini gambar
+                gm_msg.image_url,     -- Ditambahkan agar sidebar tahu ini gambar
                 gm_msg.sent_at AS last_message_time,
                 u.username AS sender_username
             FROM groups g
-            -- Mengunci daftar grup hanya untuk member yang terdaftar
             INNER JOIN group_members g_mem ON g.group_id = g_mem.group_id
             LEFT JOIN (
                 SELECT gm1.*
@@ -100,15 +104,17 @@ static async findBygroupId(req, res) {
         const rows = await messageGrup.findByGroupId(groupId);
         
         const messages = rows.map(msg => ({
-            messageId: msg.message_id,
-            content: msg.content,
-            timestamp: msg.timestamp,
-            sender: {
-                id: msg.user_id,
-                username: msg.username,
-                stat: msg.status // Sesuaikan dengan field di DB (online/offline)
-            }
-        }));
+    messageId: msg.message_id,
+    content: msg.content,
+    messageType: msg.message_type,
+    imageUrl: msg.image_url,
+    timestamp: msg.timestamp,
+    sender: {
+        id: msg.user_id,
+        username: msg.username,
+        stat: msg.status
+    }
+}));
 
         // 2. Ambil role user di grup tersebut
         const [memberInfo] = await db.query(
@@ -140,34 +146,54 @@ static async findBygroupId(req, res) {
         });
     }
 }
-static async sendMessage(req) { // Hapus parameter res jika tidak dipakai kirim respon di sini
+static async sendMessage(req) {
   try {
     const { content } = req.body;
-    const { groupId } = req.params; // Sesuai route: :groupId
+    const { groupId } = req.params;
     const senderId = req.user?.userId;
 
-    let finalcontent = content || '';
+    let messageType = 'text';
+    let imageUrl = null;
+
+    // JIKA ADA FILE GAMBAR
     if (req.file) {
-      const imageUrl = `http://localhost:3000/uploads/${req.file.filename}`;
-      finalcontent += imageUrl;
+      messageType = 'image';
+      // Kita pakai format .webp agar size gambar kaos distro-mu jadi super kecil (KB bukan MB)
+      const fileName = `group-${Date.now()}.webp`;
+      const uploadPath = path.join(__dirname, '../public/uploads', fileName);
+
+      // PROSES KOMPRESI DENGAN SHARP
+      await sharp(req.file.buffer)
+        .resize({ width: 800, withoutEnlargement: true }) // Lebar maks 800px
+        .webp({ quality: 75 }) // Kualitas 75% sudah sangat jernih di HP
+        .toFile(uploadPath);
+
+      imageUrl = fileName;
     }
 
+    // SIMPAN KE DATABASE (Pastikan model messageGrup sudah mendukung messageType & imageUrl)
     const messageId = await messageGrup.sendMessage({
       groupId,
       senderId,
-      content: finalcontent
+      content: content || null, // Sekarang content murni teks/caption saja
+      messageType: messageType,
+      imageUrl: imageUrl
     });
 
-    // CUKUP RETURN DATA SAJA
+    // RETURN DATA UNTUK SOCKET.IO
     return { 
       messageId, 
-      senderName: req.user?.username, // Pastikan ini ada untuk socket
-      message_text: content,
+      groupId,
+      senderId,
+      senderName: req.user?.username,
+      content: content || '',
+      messageType: messageType,
+      imageUrl: imageUrl, // Kirim nama filenya saja
       created_at: new Date() 
     };
   } catch (error) {
     console.error('SERVER ERROR:', error);
-    throw error; // Lempar error agar ditangkap catch di route
+    throw error;
   }
 }
 
