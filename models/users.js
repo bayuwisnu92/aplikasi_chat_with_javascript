@@ -104,7 +104,7 @@ class User {
     const token = jwt.sign(
   { userId: user.user_id, email: user.email },  // Perhatikan user.user_id
   process.env.JWT_SECRET,
-  { expiresIn: '24h' }
+  { expiresIn: '1y' }
 );
 
     return token;
@@ -143,9 +143,15 @@ class User {
         ELSE u1.status
       END AS status,
 
+      /* HANYA MENAMBAHKAN INI */
+      CASE
+        WHEN c.user_one = ? THEN u2.profile_picture
+        ELSE u1.profile_picture
+      END AS profile_picture,
+
       m.content AS last_message,
-      m.message_type,  /* <--- TAMBAHKAN INI */
-      m.image_url,     /* <--- TAMBAHKAN INI */
+      m.message_type,
+      m.image_url,
       m.sent_at AS last_message_time
 
     FROM conversations c
@@ -174,7 +180,7 @@ class User {
   `;
 
   const [rows] = await db.query(query, [
-    currentUserId, currentUserId, currentUserId, currentUserId, currentUserId
+    currentUserId, currentUserId, currentUserId, currentUserId, currentUserId, currentUserId
   ]);
 
   return rows;

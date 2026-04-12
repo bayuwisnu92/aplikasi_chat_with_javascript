@@ -77,7 +77,7 @@ route.get('/users', authenticate, usersController.getAllUsers);
 route.put('/updateProfile', authenticate, usersController.updateProfile);
 route.get('/contacts',authenticate, usersController.getContacts);
 route.get('/users/search', authenticate, usersController.searchUsers);
-
+route.post('/update-photo', authenticate, upload.single('profile_picture'), usersController.updateProfile);
 /* =========================
    PRIVATE CHAT
 ========================= */

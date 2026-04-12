@@ -60,34 +60,35 @@ static async allGrup(req, res) {
         const userId = req.user?.userId; 
 
         const [rows] = await db.query(
-            `SELECT 
-                g.group_id,
-                g.name AS group_name,
-                g.created_by,
-                g.created_at,
-                gm_msg.content AS last_message,
-                gm_msg.message_type,  -- Ditambahkan agar sidebar tahu ini gambar
-                gm_msg.image_url,     -- Ditambahkan agar sidebar tahu ini gambar
-                gm_msg.sent_at AS last_message_time,
-                u.username AS sender_username
-            FROM groups g
-            INNER JOIN group_members g_mem ON g.group_id = g_mem.group_id
-            LEFT JOIN (
-                SELECT gm1.*
-                FROM group_messages gm1
-                JOIN (
-                    SELECT group_id, MAX(sent_at) AS last_time
-                    FROM group_messages
-                    GROUP BY group_id
-                ) gm2 ON gm1.group_id = gm2.group_id AND gm1.sent_at = gm2.last_time
-            ) gm_msg ON g.group_id = gm_msg.group_id
-            LEFT JOIN users u ON gm_msg.sender_id = u.user_id
-            WHERE g_mem.user_id = ?
-            ORDER BY 
-                IF(gm_msg.sent_at IS NULL, 1, 0),
-                gm_msg.sent_at DESC;`,
-            [userId]
-        );
+    `SELECT 
+        g.group_id,
+        g.name AS group_name,
+        g.profile_picture,    -- TAMBAHKAN INI
+        g.created_by,
+        g.created_at,
+        gm_msg.content AS last_message,
+        gm_msg.message_type,
+        gm_msg.image_url,
+        gm_msg.sent_at AS last_message_time,
+        u.username AS sender_username
+    FROM groups g
+    INNER JOIN group_members g_mem ON g.group_id = g_mem.group_id
+    LEFT JOIN (
+        SELECT gm1.*
+        FROM group_messages gm1
+        JOIN (
+            SELECT group_id, MAX(sent_at) AS last_time
+            FROM group_messages
+            GROUP BY group_id
+        ) gm2 ON gm1.group_id = gm2.group_id AND gm1.sent_at = gm2.last_time
+    ) gm_msg ON g.group_id = gm_msg.group_id
+    LEFT JOIN users u ON gm_msg.sender_id = u.user_id
+    WHERE g_mem.user_id = ?
+    ORDER BY 
+        IF(gm_msg.sent_at IS NULL, 1, 0),
+        gm_msg.sent_at DESC;`,
+    [userId]
+);
 
         res.status(200).json(rows);
     } catch (error) {

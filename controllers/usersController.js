@@ -1,4 +1,8 @@
 const User = require('../models/users');
+const path = require('path');
+const fs = require('fs');
+const sharp = require('sharp');
+const db = require('../db');
 
 class UsersController {
     static async getAllUsers(req, res) {
@@ -14,16 +18,47 @@ class UsersController {
 }
 
 static async updateProfile(req,res){
-    try{
-        const id = req.user.userId
-        const { imageProfile } = req.body 
-         await User.updateProfile(id,imageProfile)
-        res.status(200).json({message:'berhasil di update'})
-    }
-    catch(error){
-        console.error('terjagagal mengupdate gambar profile',error)
-    
-    }
+    try {
+            if (!req.file) {
+                return res.status(400).json({ message: 'Mana fotonya, lur? Belum dipilih nih.' });
+            }
+
+            const userId = req.user.userId;
+            // Nama file unik pakai ID user dan timestamp
+            const fileName = `pp-${userId}-${Date.now()}.webp`;
+            const uploadPath = path.join(__dirname, '../public/uploads/profile', fileName);
+
+            // Pastikan folder 'profile' sudah ada, kalau belum kita buat
+            const dir = path.join(__dirname, '../public/uploads/profile');
+            if (!fs.existsSync(dir)) {
+                fs.mkdirSync(dir, { recursive: true });
+            }
+
+            // PROSES SHARP: Resize jadi 300x300 (biar pas di lingkaran)
+            await sharp(req.file.buffer)
+                .resize(300, 300, {
+                    fit: 'cover',
+                    position: 'center'
+                })
+                .webp({ quality: 80 })
+                .toFile(uploadPath);
+
+            // UPDATE KE DATABASE
+            // Kolom profile_picture sesuai di screenshot tabel users kamu
+            await db.query(
+                'UPDATE users SET profile_picture = ? WHERE user_id = ?',
+                [fileName, userId]
+            );
+
+            res.status(200).json({
+                message: 'Mantap! Foto profil berhasil diupdate.',
+                imageUrl: fileName
+            });
+
+        } catch (error) {
+            console.error('Error Update PP:', error);
+            res.status(500).json({ message: 'Waduh, gagal update foto profil nih.' });
+        }
 }
 
 
