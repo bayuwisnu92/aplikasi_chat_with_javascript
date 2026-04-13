@@ -302,5 +302,64 @@ static async searchUser(req, res) {
     }
 }
 
+static async updateGroupProfile(req, res) {
+    const { groupId } = req.params; 
+    const userId = req.user.userId;
+
+    // 1. CEK FILE (Gunakan buffer karena pakai memoryStorage)
+    if (!req.file) {
+        return res.status(400).json({ message: 'Gambar wajib dipilih, lur!' });
+    }
+
+    const connection = await db.getConnection();
+    try {
+        // 2. CEK ADMIN
+        const [member] = await connection.query(
+            `SELECT role FROM group_members WHERE group_id = ? AND user_id = ?`,
+            [groupId, userId]
+        );
+
+        if (member.length === 0 || member[0].role !== 'admin') {
+            return res.status(403).json({ 
+                status: 'error', 
+                message: 'Hanya admin grup yang bisa ganti foto!' 
+            });
+        }
+
+        // 3. PROSES GAMBAR DENGAN SHARP (Sama seperti sendMessage)
+        const fileName = `group-profile-${Date.now()}.webp`;
+        // Pastikan path folder ini benar sesuai struktur sservermu
+        const uploadPath = path.join(__dirname, '../public/uploads/profile', fileName);
+
+        // Pastikan folder 'profile' ada, jika tidak, buat otomatis
+        if (!fs.existsSync(path.dirname(uploadPath))) {
+            fs.mkdirSync(path.dirname(uploadPath), { recursive: true });
+        }
+
+        await sharp(req.file.buffer)
+            .resize({ width: 400, height: 400, fit: 'cover' }) // Ukuran kotak rapi untuk profil
+            .webp({ quality: 80 })
+            .toFile(uploadPath);
+
+        // 4. UPDATE DATABASE
+        await connection.query(
+            `UPDATE groups SET profile_picture = ? WHERE group_id = ?`,
+            [fileName, groupId]
+        );
+
+        res.status(200).json({
+            status: 'success',
+            message: 'Foto profil grup berhasil diperbarui',
+            profile_picture: fileName
+        });
+
+    } catch (error) {
+        console.error("Error saat updateGroupProfile:", error);
+        res.status(500).json({ status: 'error', message: 'Gagal update foto grup' });
+    } finally {
+        connection.release();
+    }
+}
+
 }
 module.exports = chatGroup

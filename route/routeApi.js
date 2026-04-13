@@ -78,6 +78,10 @@ route.put('/updateProfile', authenticate, usersController.updateProfile);
 route.get('/contacts',authenticate, usersController.getContacts);
 route.get('/users/search', authenticate, usersController.searchUsers);
 route.post('/update-photo', authenticate, upload.single('profile_picture'), usersController.updateProfile);
+if (!chatGroup.updateGroupProfile) {
+  console.error('updateGroupProfile NOT FOUND');
+}
+route.post('/updategrupphoto/:groupId', authenticate, upload.single('profile_picture'), chatGroup.updateGroupProfile);
 /* =========================
    PRIVATE CHAT
 ========================= */
