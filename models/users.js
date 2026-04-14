@@ -187,21 +187,28 @@ class User {
 }
 
 static async searchUsers(keyword, currentUserId) {
-
   const query = `
     SELECT 
       user_id,
       username,
-      status
+      status,
+      email,
+      profile_picture
     FROM users
-    WHERE username LIKE ?
+    WHERE (username LIKE ? OR email LIKE ?)
     AND user_id != ?
     LIMIT 20
   `;
 
+  // Bungkus keyword dengan %
+  const searchPattern = `%${keyword}%`;
+
+  // SEBELUMNYA: kamu cuma kirim [searchPattern, currentUserId] -> KURANG SATU!
+  // SEKARANG: pasangkan tiap ? dengan nilainya masing-masing
   const [rows] = await db.query(query, [
-    `%${keyword}%`,
-    currentUserId
+    searchPattern, // Mengisi ? pertama (username)
+    searchPattern, // Mengisi ? kedua (email)
+    currentUserId  // Mengisi ? ketiga (user_id !=)
   ]);
 
   return rows;

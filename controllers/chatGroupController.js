@@ -360,6 +360,40 @@ static async updateGroupProfile(req, res) {
         connection.release();
     }
 }
+static async getMemberGrup(req, res) {
+  try {
+    const { groupId } = req.params;
 
+    if (!groupId) {
+      return res.status(400).json({ message: 'groupId wajib diisi' });
+    }
+
+    const [members] = await db.query(
+      `SELECT 
+         u.user_id,
+         u.username,
+         u.last_online,
+         gm.role,
+         u.profile_picture
+       FROM group_members gm
+       JOIN users u ON gm.user_id = u.user_id
+       WHERE gm.group_id = ?`,
+      [groupId]
+    );
+
+    return res.status(200).json({
+      success: true,
+      total: members.length,
+      data: members
+    });
+
+  } catch (error) {
+    console.error('Error getMemberGrup:', error);
+    return res.status(500).json({
+      success: false,
+      message: 'Internal server error'
+    });
+  }
+}
 }
 module.exports = chatGroup

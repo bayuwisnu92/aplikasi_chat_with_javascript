@@ -207,7 +207,10 @@ route.get('/grup/:groupId/messages',
   authenticate,
   chatGroup.findBygroupId
 );
-
+route.get('/membergrup/:groupId',
+  authenticate,
+  chatGroup.getMemberGrup
+);
 /* =========================
    GROUP CHAT
 ========================= */
