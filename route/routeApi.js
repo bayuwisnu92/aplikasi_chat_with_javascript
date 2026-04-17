@@ -114,6 +114,7 @@ route.post('/:conversationId/send',
       // 2. Update Daftar Kontak untuk PENERIMA
       io.to("user_" + result.receiverId).emit("updateContactList", {
         conversationId: result.conversationId,
+        senderId: result.senderId,
         senderName: result.senderName,
         content: previewContent, // Pakai preview agar muncul icon kamera
         timestamp: result.timestamp
@@ -122,6 +123,7 @@ route.post('/:conversationId/send',
       // 3. Update Daftar Kontak untuk PENGIRIM
       io.to("user_" + req.user.userId).emit("updateContactList", {
         conversationId: result.conversationId,
+        senderId: result.senderId,
         senderName: "Anda",
         content: previewContent,
         timestamp: result.timestamp
@@ -146,8 +148,10 @@ route.delete('/hapuspesan/:messageId',
       const result = await chatController.hapusPesan(req);
 
       const io = getIO();
+        console.log("emit ke room:", "chat_" + result.conversationId);
+        console.log("messageId:", result.messageId);
 
-      io.to("chat_" + result.conversationId)
+      io.to(result.conversationId)
         .emit("messageDeleted", {
           messageId: result.messageId
         });
@@ -230,6 +234,7 @@ route.post('/grup/:groupId/send',
       io.emit("updateGroupContactList", {
         groupId: req.params.groupId,
         senderName: result.senderName,
+        senderId: result.senderId,
         lastMessage: result.message_text || '📷 Mengirim gambar',
         timestamp: result.created_at
       });
@@ -244,7 +249,23 @@ route.post('/grup/:groupId/send',
 
 route.delete('/delete/grup/:messageId',
   authenticate,
-  chatGroup.deleteGrupMessage
+  async (req, res) => {
+    try {
+      const result = await chatGroup.deleteGrupMessage(req);
+      const io = getIO();
+
+      // 🔥 emit ke room group
+      io.to("group_" + result.groupId).emit("groupMessageDeleted", {
+        messageId: result.messageId
+      });
+
+      res.status(200).json({ message: 'Pesan grup berhasil dihapus' });
+
+    } catch (err) {
+      console.error("group delete error:", err);
+      res.status(500).json({ error: err.message });
+    }
+  }
 );
 
 route.get('/editpesangrup/:messageId',

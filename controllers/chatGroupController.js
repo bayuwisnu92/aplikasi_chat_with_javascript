@@ -198,22 +198,33 @@ static async sendMessage(req) {
   }
 }
 
-static async deleteGrupMessage(req,res){
- try{
-    const id =req.params.messageId
- const deleteGrup = await messageGrup.deleteMessage(id)
- if(deleteGrup){
-    res.status(200).json({
-        status:'success',
-        message:'pesan berhasil di hapus'
-    })
- }
- }catch(error){
-    res.status(500).json({
-        status:'error',
-        message:'pesan gagal di hapus'
-    })
- }
+static async deleteGrupMessage(req) {
+  const messageId = req.params.messageId;
+
+  // 🔥 ambil groupId dulu
+  const [rows] = await db.execute(
+    'SELECT group_id FROM group_messages WHERE message_id = ?',
+    [messageId]
+  );
+
+  if (!rows.length) {
+    throw new Error("Pesan tidak ditemukan");
+  }
+
+  const groupId = rows[0].group_id;
+
+  const deleted = await messageGrup.deleteMessage(messageId);
+
+  if (!deleted) {
+    throw new Error("Gagal menghapus pesan");
+  }
+
+  console.log("GROUP ID (DB):", groupId);
+
+  return {
+    messageId,
+    groupId
+  };
 }
 static async editPesanGrup(req,res){
   try{
@@ -363,6 +374,7 @@ static async updateGroupProfile(req, res) {
 static async getMemberGrup(req, res) {
   try {
     const { groupId } = req.params;
+    const userId = req.user.userId;
 
     if (!groupId) {
       return res.status(400).json({ message: 'groupId wajib diisi' });
@@ -380,11 +392,17 @@ static async getMemberGrup(req, res) {
        WHERE gm.group_id = ?`,
       [groupId]
     );
-
+    const dataWithStatus = members.map(member => ({
+      user_id : member.user_id,
+      username : userId === member.user_id ? `${member.username} (Anda)` : member.username,
+      last_online : member.last_online,
+      role : member.role,
+      profile_picture : member.profile_picture,
+    }));
     return res.status(200).json({
       success: true,
       total: members.length,
-      data: members
+      data: dataWithStatus
     });
 
   } catch (error) {
