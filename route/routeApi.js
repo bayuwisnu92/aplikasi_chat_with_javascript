@@ -109,7 +109,8 @@ route.post('/:conversationId/send',
         : result.content;
 
       // 1. Update Bubble Chat (Realtime di room chat)
-      io.to(req.params.conversationId).emit("newMessage", result);
+      io.to("user_" + result.receiverId).emit("newMessage", result);
+      io.to("user_" + result.senderId).emit("newMessage", result);
 
       // 2. Update Daftar Kontak untuk PENERIMA
       io.to("user_" + result.receiverId).emit("updateContactList", {
@@ -150,11 +151,22 @@ route.delete('/hapuspesan/:messageId',
       const io = getIO();
         console.log("emit ke room:", "chat_" + result.conversationId);
         console.log("messageId:", result.messageId);
+        console.log("DELETE TARGET RECEIVER:", result.receiverId, "->", "user_" + result.receiverId);
+      io.to("user_" + result.senderId).emit("messageDeleted", {
+  messageId: result.messageId
+});
 
-      io.to(result.conversationId)
-        .emit("messageDeleted", {
-          messageId: result.messageId
-        });
+io.to("user_" + result.receiverId).emit("messageDeleted", {
+  messageId: result.messageId
+});
+
+io.to("user_" + result.senderId).emit("updateContactListAfterDelete", {
+  conversationId: result.conversationId
+});
+
+io.to("user_" + result.receiverId).emit("updateContactListAfterDelete", {
+  conversationId: result.conversationId
+});
 
       res.status(200).json({ message: 'Pesan berhasil dihapus' });
 
@@ -254,9 +266,16 @@ route.delete('/delete/grup/:messageId',
       const result = await chatGroup.deleteGrupMessage(req);
       const io = getIO();
 
-      // 🔥 emit ke room group
+      // 1. hapus di chat (semua member)
       io.to("group_" + result.groupId).emit("groupMessageDeleted", {
         messageId: result.messageId
+      });
+
+      // 2. update contact list grup
+      io.emit("updateGroupContactList", {
+        groupId: result.groupId,
+        lastMessage: "Pesan dihapus",
+        timestamp: new Date()
       });
 
       res.status(200).json({ message: 'Pesan grup berhasil dihapus' });

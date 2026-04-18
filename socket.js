@@ -17,7 +17,7 @@ const initSocket = (server) => {
 });
 
   io.on("connection", (socket) => {
-
+    
     console.log("User connected:", socket.id);
 
     const token = socket.handshake.auth?.token;
@@ -39,6 +39,7 @@ const initSocket = (server) => {
       // Setiap user join ke room unik berdasarkan ID-nya sendiri
       socket.join("user_" + userId); 
       console.log(`User ${userId} bergabung ke room pribadi: user_${userId}`);
+      console.log("USER JOIN:", userId, "->", "user_" + userId);
       // ===========================
       // update status online
       db.query(
@@ -54,19 +55,17 @@ const initSocket = (server) => {
       // =========================
       // JOIN PRIVATE CONVERSATION
       // =========================
-      socket.on("joinConversation", (conversationId) => {
-        console.log("JOIN CONVERSATION:", conversationId);
-        socket.join(conversationId);
-      });
+      // PRIVATE
+        socket.on("joinConversation", (conversationId) => {
+          const room = "chat_" + conversationId;
+          socket.join(room);
+        });
 
-      // =========================
-      // JOIN GROUP
-      // =========================
-      socket.on("joinGroup", (groupId) => {
-        const room = "group_" + groupId;
-        console.log("JOIN GROUP:", room);
-        socket.join(room);
-      });
+        // GROUP
+        socket.on("joinGroup", (groupId) => {
+          const room = "group_" + groupId;
+          socket.join(room);
+        });
 
       // =========================
       // DISCONNECT

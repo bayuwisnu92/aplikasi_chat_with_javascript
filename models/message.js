@@ -75,13 +75,13 @@ static async updatePesan(messageId,newContent){
 
 static async findById(messageId) {
   const [rows] = await db.query(
-    `SELECT message_id, conversation_id, content 
+    `SELECT message_id, conversation_id, sender_id, content 
      FROM messages 
      WHERE message_id = ?`,
     [messageId]
   );
 
-  return rows[0]; // ambil 1 data saja
+  return rows[0];
 }
 }
 

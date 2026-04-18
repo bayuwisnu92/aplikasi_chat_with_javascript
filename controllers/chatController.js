@@ -185,21 +185,40 @@ static async getMessages(req, res) {
 }
 static async hapusPesan(req) {
   try {
-
     const { messageId } = req.params;
 
-    // 🔥 ambil conversationId dulu
     const message = await Message.findById(messageId);
 
     if (!message) {
       throw new Error("Pesan tidak ditemukan");
     }
-
+    console.log("MESSAGE FULL:", message);
+console.log("SENDER_ID:", message?.sender_id);
+console.log("CONVERSATION_ID:", message?.conversation_id);
     await Message.hapusPesan(messageId);
 
+   const [rows] = await db.query(
+  `SELECT user_one, user_two 
+   FROM conversations 
+   WHERE conversation_id = ?`,
+  [message.conversation_id]
+);
+
+    const convo = rows[0];
+
+    if (!convo) {
+      throw new Error("Conversation tidak ditemukan");
+    }
+
+    const receiverId =
+  convo.user_one == message.sender_id
+    ? convo.user_two
+    : convo.user_one;
     return {
       messageId,
-      conversationId: message.conversation_id
+      conversationId: message.conversation_id,
+      senderId: message.sender_id,
+      receiverId
     };
 
   } catch (error) {

@@ -201,9 +201,9 @@ static async sendMessage(req) {
 static async deleteGrupMessage(req) {
   const messageId = req.params.messageId;
 
-  // 🔥 ambil groupId dulu
+  // 🔥 ambil groupId + senderId
   const [rows] = await db.execute(
-    'SELECT group_id FROM group_messages WHERE message_id = ?',
+    'SELECT group_id, sender_id FROM group_messages WHERE message_id = ?',
     [messageId]
   );
 
@@ -211,7 +211,7 @@ static async deleteGrupMessage(req) {
     throw new Error("Pesan tidak ditemukan");
   }
 
-  const groupId = rows[0].group_id;
+  const { group_id: groupId, sender_id: senderId } = rows[0];
 
   const deleted = await messageGrup.deleteMessage(messageId);
 
@@ -219,11 +219,13 @@ static async deleteGrupMessage(req) {
     throw new Error("Gagal menghapus pesan");
   }
 
-  console.log("GROUP ID (DB):", groupId);
+  console.log("GROUP ID:", groupId);
+  console.log("SENDER ID:", senderId);
 
   return {
     messageId,
-    groupId
+    groupId,
+    senderId
   };
 }
 static async editPesanGrup(req,res){
