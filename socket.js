@@ -16,6 +16,7 @@ const initSocket = (server) => {
   }
 });
 
+const onlineUsers = new Map(); // userId -> jumlah koneksi
   io.on("connection", (socket) => {
     
     console.log("User connected:", socket.id);
@@ -47,10 +48,19 @@ const initSocket = (server) => {
         [userId]
       );
 
-      io.emit("user_status", {
-        userId,
-        status: "online"
-      });
+     if (!onlineUsers.has(userId)) {
+  onlineUsers.set(userId, 0);
+}
+
+onlineUsers.set(userId, onlineUsers.get(userId) + 1);
+
+// 🔥 hanya emit kalau ini koneksi pertama
+if (onlineUsers.get(userId) === 1) {
+  io.emit("user_status", {
+    userId,
+    status: "online"
+  });
+}
 
       // =========================
       // JOIN PRIVATE CONVERSATION
@@ -72,19 +82,26 @@ const initSocket = (server) => {
       // =========================
       socket.on("disconnect", async () => {
 
-        console.log("User disconnected:", socket.id);
+  const count = onlineUsers.get(userId) || 0;
 
-        await db.query(
-          "UPDATE users SET status='offline', last_online=NOW() WHERE user_id=?",
-          [userId]
-        );
+  if (count <= 1) {
+    onlineUsers.delete(userId);
 
-        io.emit("user_status", {
-          userId,
-          status: "offline"
-        });
+    await db.query(
+      "UPDATE users SET status='offline', last_online=NOW() WHERE user_id=?",
+      [userId]
+    );
 
-      });
+    io.emit("user_status", {
+      userId,
+      status: "offline"
+    });
+
+  } else {
+    onlineUsers.set(userId, count - 1);
+  }
+
+});
 
     } catch (err) {
       console.log("TOKEN INVALID:", err.message);
