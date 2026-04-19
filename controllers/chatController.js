@@ -255,8 +255,26 @@ static async updatePesan(req){
 
     await Message.updatePesan(messageId, content);
 
+    const [rows] = await db.query(
+  `SELECT user_one, user_two 
+   FROM conversations 
+   WHERE conversation_id = ?`,
+  [message.conversation_id]
+);
+
+const convo = rows[0];
+
+const senderId = Number(message.sender_id);
+const userOne = Number(convo.user_one);
+const userTwo = Number(convo.user_two);
+
+const receiverId =
+  userOne === senderId ? userTwo : userOne;
+
     return {
       messageId,
+      senderId,
+      receiverId,
       conversationId: message.conversation_id,
       content
     };

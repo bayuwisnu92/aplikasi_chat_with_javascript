@@ -203,6 +203,20 @@ route.put('/updatePesan/:messageId',
       io.to("chat_" + result.conversationId)
         .emit("messageEdited", result);
 
+      // 2. 🔥 update contact list (SENDER)
+          io.to("user_" + result.senderId).emit("updateContactList", {
+            conversationId: result.conversationId,
+            content: result.content,
+            timestamp: new Date()
+          });
+
+          // 3. 🔥 update contact list (RECEIVER)
+          io.to("user_" + result.receiverId).emit("updateContactList", {
+            conversationId: result.conversationId,
+            content: result.content,
+            timestamp: new Date()
+          })
+
       res.status(200).json(result);
 
     } catch (err) {

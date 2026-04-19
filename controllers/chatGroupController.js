@@ -283,18 +283,48 @@ static async addMember(req, res) {
     }
 }
 
-static async updatePesanGrup(req,res){
-  try{
+static async updatePesanGrup(req, res) {
+  try {
     const { messageId } = req.params;
     const { content } = req.body;
-    await messageGrup.updatemessagegrup(messageId,content);
+
+    // 🔥 ambil data message dulu
+    const [rows] = await db.query(
+      `SELECT group_id, sender_id 
+       FROM group_messages 
+       WHERE message_id = ?`,
+      [messageId]
+    );
+
+    if (!rows.length) {
+      throw new Error("Pesan tidak ditemukan");
+    }
+
+    const { group_id: groupId, sender_id: senderId } = rows[0];
+
+    await messageGrup.updatemessagegrup(messageId, content);
+
+    const io = getIO();
+
+    // 🔥 emit ke semua member grup
+    io.to("group_" + groupId).emit("groupMessageEdited", {
+      messageId,
+      groupId,
+      senderId,
+      content
+    });
+            io.emit("updateGroupContactList", {
+        groupId,
+        lastMessage: content,
+        timestamp: new Date()
+        });
+
     res.status(200).json({ message: 'Pesan berhasil diupdate' });
-  }
-  catch(error){
+
+  } catch (error) {
     console.error('Gagal mengupdate pesan:', error);
     res.status(500).json({ error: 'Terjadi kesalahan saat mengupdate pesan' });
   }
-
 }
 
 static async searchUser(req, res) {
