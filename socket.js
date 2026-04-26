@@ -77,39 +77,54 @@ if (onlineUsers.get(userId) === 1) {
           socket.join(room);
         });
 
-        socket.on("typing", async ({ conversationId, senderId }) => {
-         const room = "chat_" + conversationId;
-           console.log("👉 BACKEND TERIMA:", { senderId, conversationId });
-        try {
-          console.log("SEBELUM QUERY:", senderId);
-          const [rows] = await db.query(
-            "SELECT username FROM users WHERE user_id=?",
-            [senderId]
-          );
-          console.log("👉 HASIL QUERY:", rows[0]);
+        socket.on("typing", async ({ type, id, senderId }) => {
+  try {
+    const room = type === "group"
+      ? "group_" + id
+      : "chat_" + id;
 
-              socket.to(room).emit("userTyping", {
-                senderId,
-                conversationId,
-                username: rows[0]?.username || "User"
-              });
+    const [rows] = await db.query(
+      "SELECT username FROM users WHERE user_id=?",
+      [senderId]
+    );
 
-            } catch (err) {
-              console.error("Error ambil username:", err);
-            }
-          });
+    socket.to(room).emit("userTyping", {
+      senderId,
+      id,
+      type,
+      username: rows[0]?.username || "User"
+    });
 
-        socket.on("stopTyping", async ({ conversationId, senderId }) => {
-          const room = "chat_" + conversationId;
-          
-          const [rows] =  await db.query("SELECT username FROM users WHERE user_id=?", [senderId]);
-          socket.to(room).emit("userStopTyping", {
-            senderId,
-            conversationId,
-            username: rows[0]?.username || "User"
-          });
-          
-        });
+  } catch (err) {
+    console.error("Error ambil username:", err);
+  }
+});
+
+
+socket.on("stopTyping", async ({ type, id, senderId }) => {
+  try {
+    const room = type === "group"
+      ? "group_" + id
+      : "chat_" + id;
+
+    const [rows] = await db.query(
+      "SELECT username FROM users WHERE user_id=?",
+      [senderId]
+    );
+
+    socket.to(room).emit("userStopTyping", {
+      senderId,
+      id,
+      type,
+      username: rows[0]?.username || "User"
+    });
+
+  } catch (err) {
+    console.error("Error stopTyping:", err);
+  }
+});
+        
+        
         socket.on("messageDelivered", async ({ messageId, conversationId }) => {
         await db.query(
           "UPDATE messages SET status='delivered' WHERE message_id=?",
