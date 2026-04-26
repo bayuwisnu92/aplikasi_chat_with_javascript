@@ -116,7 +116,8 @@ static async sendMessage(req) {
       senderId,
       content: content || null, // Bisa null kalau hanya kirim gambar
       messageType: messageType,
-      imageUrl: imageUrl
+      imageUrl: imageUrl,
+      status: 'sent'
     });
 
     // 3. Return data lengkap untuk Socket.io
@@ -129,7 +130,8 @@ static async sendMessage(req) {
       content: content || '',
       messageType, 
       imageUrl, // Nama file untuk diolah di frontend
-      timestamp: new Date()
+      timestamp: new Date(),
+      status: 'sent'
     };
 
   } catch (error) {
@@ -162,16 +164,19 @@ static async getMessages(req, res) {
 
     // MAPPING DATA KE FRONTEND
     const messages = rawMessages.map(msg => ({
-      messageId: msg.message_id,
-      content: msg.content,
-      messageType: msg.message_type, // TAMBAHKAN INI
-      imageUrl: msg.image_url,       // TAMBAHKAN INI
-      timestamp: msg.timestamp,
-      sender: {
-        id: msg.user_id,
-        username: msg.username
-      }
-    }));
+  messageId: msg.message_id,
+  content: msg.content,
+  messageType: msg.message_type,
+  imageUrl: msg.image_url,
+  timestamp: msg.timestamp,
+   // Mengambil alias dari status pesan
+  sender: {
+    id: msg.user_id,
+    username: msg.username,
+    status: msg.user_status    // Kamu juga bisa masukkan status user ke sini
+  },
+  status: msg.message_status
+}));
 
     res.json({
       messages,

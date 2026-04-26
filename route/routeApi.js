@@ -130,6 +130,11 @@ route.post('/:conversationId/send',
         timestamp: result.timestamp
       });
 
+      io.to("user_" + result.senderId).emit("messageStatus", {
+          messageId: result.messageId,
+          status: "sent"
+        });
+
       res.status(200).json(result);
     } catch (err) {
       console.error("socket send error:", err);

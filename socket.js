@@ -110,6 +110,45 @@ if (onlineUsers.get(userId) === 1) {
           });
           
         });
+        socket.on("messageDelivered", async ({ messageId, conversationId }) => {
+        await db.query(
+          "UPDATE messages SET status='delivered' WHERE message_id=?",
+          [messageId]
+        );
+
+        io.to("chat_" + conversationId).emit("messageStatus", {
+          messageId,
+          status: "delivered"
+        });
+});
+
+socket.on("messageRead", async ({ conversationId }) => {
+  const userId = socket.userId;
+
+  const [rows] = await db.query(
+    `SELECT message_id FROM messages 
+     WHERE conversation_id=? 
+     AND sender_id != ? 
+     AND status != 'read'`,
+    [conversationId, userId]
+  );
+
+  if (!rows.length) return;
+
+  const messageIds = rows.map(r => r.message_id);
+
+  await db.query(
+    `UPDATE messages 
+     SET status='read' 
+     WHERE message_id IN (?)`,
+    [messageIds]
+  );
+
+  io.to("chat_" + conversationId).emit("messageStatus", {
+    messageIds,
+    status: "read"
+  });
+});
 
       // =========================
       // DISCONNECT

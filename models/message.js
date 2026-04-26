@@ -4,17 +4,18 @@ const jwt = require('jsonwebtoken');
 
 
 class Message {
- static async create({ conversationId, senderId, content, messageType, imageUrl }) {
+ static async create({ conversationId, senderId, content, messageType, imageUrl, status }) {
     const [result] = await db.execute(
         `INSERT INTO messages 
-         (conversation_id, sender_id, content, message_type, image_url, sent_at) 
-         VALUES (?, ?, ?, ?, ?, NOW())`, // Ganti created_at jadi sent_at
+         (conversation_id, sender_id, content, message_type, image_url, status, sent_at) 
+         VALUES (?, ?, ?, ?, ?, ?, NOW())`, // Ganti created_at jadi sent_at
         [
             conversationId, 
             senderId, 
             content || null, 
             messageType || 'text', 
-            imageUrl || null
+            imageUrl || null,
+            status
         ]
     );
     return result.insertId;
@@ -23,19 +24,20 @@ class Message {
   static async findByConversation(conversationId) {
   const [rows] = await db.execute(`
     SELECT 
-      m.message_id,
-      m.content,
-      m.message_type,  -- TAMBAHKAN INI
-      m.image_url,     -- TAMBAHKAN INI
-      m.sent_at AS timestamp,
-      u.user_id,
-      u.last_online,
-      u.status,
-      u.username
-    FROM messages m
-    JOIN users u ON m.sender_id = u.user_id
-    WHERE m.conversation_id = ?
-    ORDER BY m.sent_at ASC
+    m.message_id,
+    m.content,
+    m.message_type,
+    m.image_url,
+    m.sent_at AS timestamp,
+    m.status AS message_status,  -- Beri alias unik di sini
+    u.user_id,
+    u.last_online,
+    u.status AS user_status,      -- Beri alias unik di sini
+    u.username
+FROM messages m
+JOIN users u ON m.sender_id = u.user_id
+WHERE m.conversation_id = ?
+ORDER BY m.sent_at ASC
   `, [conversationId]);
 
   return rows;
